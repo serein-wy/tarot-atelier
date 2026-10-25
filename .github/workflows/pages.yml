@@ -1,0 +1,35 @@
+name: Deploy Tarot Atelier to GitHub Pages
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check existing application
+        run: |
+          node --check dist/app.js
+          node tests/reading.test.mjs
+          node tests/mobile-fan.test.mjs
+          node --input-type=module -e "import fs from 'node:fs'; import {deck} from './dist/deck.js'; const assets=JSON.parse(fs.readFileSync('dist/assets.json','utf8')); if(deck.length!==78) throw Error('Invalid deck'); for(const c of deck) { const p=assets[c.id]?.file; if(!p || p.startsWith('/') || p.includes('..') || !fs.existsSync('dist/'+p)) throw Error('Missing card: '+c.id); }"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
